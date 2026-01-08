@@ -6,3 +6,5 @@ langgraph
 langchain_groq
 uvicorn
 streamlit
+langchain 
+langchain-google-genai

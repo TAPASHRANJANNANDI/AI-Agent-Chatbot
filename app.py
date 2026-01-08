@@ -1,66 +1,94 @@
 # Import necessary modules and setup for FastAPI, LangGraph, and LangChain
-from fastapi import FastAPI  # FastAPI framework for creating the web application
-from pydantic import BaseModel  # BaseModel for structured data data models
-from typing import List  # List type hint for type annotations
-from langchain_community.tools.tavily_search import TavilySearchResults  # TavilySearchResults tool for handling search results from Tavily
-import os  # os module for environment variable handling
-from langgraph.prebuilt import create_react_agent  # Function to create a ReAct agent
-from langchain_groq import ChatGroq  # ChatGroq class for interacting with LLMs
-import uvicorn  # Import Uvicorn server for running the FastAPI app
+from fastapi import FastAPI
+from pydantic import BaseModel
+from typing import List
+import os
+import uvicorn
 
+# LangChain / LangGraph imports
+from langgraph.prebuilt import create_react_agent
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Retrieve and set API keys for external tools and services
-groq_api_key = os.getenv("GROQ_API_KEY", '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')  # Groq API key
-os.environ["TAVILY_API_KEY"] = os.getenv("TAVILY_API_KEY", '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')  # Set Tavily API key
+# --------------------------------------------------------------------
+# API KEYS
+# --------------------------------------------------------------------
+os.environ["GOOGLE_API_KEY"] = os.getenv(
+    "GOOGLE_API_KEY",
+    "AIzaSyDgYzv6MEud392oCkAX96BlCeqa69wa-xM"
+)
 
-# Predefined list of supported model names
+os.environ["TAVILY_API_KEY"] = os.getenv(
+    "TAVILY_API_KEY",
+    "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"
+)
+
+# --------------------------------------------------------------------
+# SUPPORTED GEMINI MODELS
+# --------------------------------------------------------------------
 MODEL_NAMES = [
-    "llama3-70b-8192",  # Model 1: Llama 3 with specific configuration
-    "mixtral-8x7b-32768"  # Model 2: Mixtral with specific configuration
+    "gemini-2.5-flash"
 ]
 
-# Initialize the TavilySearchResults tool with a specified maximum number of results.
-tool_tavily = TavilySearchResults(max_results=2)  # Allows retrieving up to 2 results
+# --------------------------------------------------------------------
+# TOOLS
+# --------------------------------------------------------------------
+tool_tavily = TavilySearchResults(max_results=2)
+tools = [tool_tavily]
 
+# --------------------------------------------------------------------
+# FASTAPI APP
+# --------------------------------------------------------------------
+app = FastAPI(title="LangGraph Gemini AI Agent")
 
-# Combine the TavilySearchResults and ExecPython tools into a list.
-tools = [tool_tavily, ]
-
-# FastAPI application setup with a title
-app = FastAPI(title='LangGraph AI Agent')
-
-# Define the request schema using Pydantic's BaseModel
+# --------------------------------------------------------------------
+# REQUEST SCHEMA
+# --------------------------------------------------------------------
 class RequestState(BaseModel):
-    system_prompt: str  # System prompt for initializing the model
-    model_name: str  # Name of the model to use for processing the request
-    messages: List[str]  # List of messages in the chat
+    system_prompt: str
+    model_name: str
+    messages: List[str]
 
-# Define an endpoint for handling chat requests
+# --------------------------------------------------------------------
+# CHAT ENDPOINT
+# --------------------------------------------------------------------
 @app.post("/chat")
 def chat_endpoint(request: RequestState):
     """
-    API endpoint to interact with the chatbot using LangGraph and tools.
-    Dynamically selects the model specified in the request.
+    Chat endpoint using Gemini + LangGraph ReAct agent
     """
+
     if request.model_name not in MODEL_NAMES:
-        # Return an error response if the model name is invalid
-        return {"error": "Invalid model name. Please select a valid model."}
+        return {
+            "error": f"Invalid model name. Choose from {MODEL_NAMES}"
+        }
 
-    # Initialize the LLM with the selected model
-    llm = ChatGroq(groq_api_key=groq_api_key, model_name=request.model_name)
+    # Initialize Gemini LLM
+    llm = ChatGoogleGenerativeAI(
+        model=request.model_name,
+        temperature=0.2
+    )
 
-    # Create a ReAct agent using the selected LLM and tools
-    agent = create_react_agent(llm, tools=tools, state_modifier=request.system_prompt)
+    # Create ReAct Agent
+    agent = create_react_agent(
+    model=llm,
+    tools=tools,
+    # state_modifier=request.system_prompt
+)
 
-    # Create the initial state for processing
-    state = {"messages": request.messages}
 
-    # Process the state using the agent
-    result = agent.invoke(state)  # Invoke the agent (can be async or sync based on implementation)
+    # Initial agent state
+    state = {
+        "messages": request.messages
+    }
 
-    # Return the result as the response
+    # Invoke agent
+    result = agent.invoke(state)
+
     return result
 
-# Run the application if executed as the main script
-if __name__ == '__main__':
-    uvicorn.run(app, host='127.0.0.1', port=8000)  # Start the app on localhost with port 8000
+# --------------------------------------------------------------------
+# RUN SERVER
+# --------------------------------------------------------------------
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000)

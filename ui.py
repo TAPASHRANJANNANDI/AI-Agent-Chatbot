@@ -18,8 +18,7 @@ given_system_prompt = st.text_area("Define you AI Agent:", height=70, placeholde
 
 # Predefined models
 MODEL_NAMES = [
-    "llama3-70b-8192",
-    "mixtral-8x7b-32768"
+   "gemini-2.5-flash"
 ]
 # Dropdown for selecting the model
 selected_model = st.selectbox("Select Model:", MODEL_NAMES)
